@@ -106,10 +106,12 @@ export function runBlockedHook(
   if (!hook) return;
   try {
     hook(info);
-  } catch (error) {
+  } catch {
+    // Do not forward the thrown object: callback errors can contain caller
+    // arguments, signer output, or other application data. The callback is an
+    // advisory sink, so its class is not needed to preserve the halt.
     logger.error(
       `stellar-agent-guard: the ${info.adapter} adapter's onBlocked callback threw; the halt stands and the action was not executed.`,
-      error,
     );
   }
 }
