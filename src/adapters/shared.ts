@@ -184,7 +184,7 @@ export function runBlockedHook(
   if (!hook) return;
   try {
     hook(info);
-  } catch (error) {
+  } catch {
     logger?.error(
       `stellar-agent-guard: the ${info.adapter} adapter's onBlocked callback threw; the halt stands and the action was not executed.`,
     );
