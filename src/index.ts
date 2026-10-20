@@ -184,6 +184,8 @@ export {
   type InvokeOutcome,
   type InvokePipelineStep,
   type InvokeParams,
+  type InvokeRetryAttempt,
+  type InvokeRetryMetadata,
   type InvokeStepEvent,
   type RetryableInvokeFailure,
 } from "./invoke.ts";
@@ -274,6 +276,8 @@ export {
   type GuardTelemetryConfig,
   type GuardTelemetryGap,
   type GuardTelemetryGapReason,
+  type GuardTelemetryHealthSnapshot,
+  type GuardTelemetryStreamState,
   type GuardTelemetryUnifiedParams,
   type GuardTelemetryWatchParams,
   type GuardUnknownTopic,
@@ -297,8 +301,10 @@ export {
   isMinimumFeeBroadcastFailure,
   isSequenceNumberFailure,
   isStaleLedgerResourceFailure,
+  isValidAgentPublicKey,
   keypairAgentSigner,
   toAgentSigner,
+  validateAgentPublicKey,
   verifyAgentSignature,
 } from "./tx.ts";
 
