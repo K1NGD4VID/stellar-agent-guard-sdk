@@ -22,6 +22,7 @@
  */
 export {
   AdapterConfigError,
+  AdapterMappingError,
   BroadcastError,
   ContractResponseError,
   GuardError,
@@ -392,6 +393,8 @@ export {
   validateContractMapping,
   validateInterceptor,
   validateOptionalFunction,
+  validateOptionalSignal,
+  validateOptionalTimeout,
   validateRequiredFunction,
   type AdapterConfigIssue,
 } from "./adapters/validate.ts";
@@ -422,8 +425,14 @@ export type {
 export {
   blockedInfoFor,
   blockedInfoForBatch,
+  checkOptionsFor,
+  hostAbortSignal,
   mapContractCalls,
+  mappingFailureFor,
+  normalizeMappedCall,
+  normalizeMappedCalls,
   runBlockedHook,
+  runDecisionHook,
 } from "./adapters/shared.ts";
 
 export type {
