@@ -9,6 +9,7 @@ import {
   Keypair,
   SorobanDataBuilder,
   StrKey,
+  rpc,
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
@@ -18,11 +19,15 @@ import {
   buildRotateAgentKeyCall,
   buildSetPolicyCall,
   buildUnfreezeCall,
+  isAdminOpOutcome,
   submitFreeze,
   submitRotateAgentKey,
   submitSetPolicy,
   submitUnfreeze,
+  waitForAdminOp,
 } from "../../src/admin.ts";
+import type { AdminOpOutcome } from "../../src/admin.ts";
+import { FakeClock } from "../../src/clock.ts";
 import { InvalidInputError } from "../../src/errors.ts";
 import {
   policyToScVal,
@@ -405,6 +410,187 @@ describe("admin helpers forward signal and timeoutMs", () => {
     assert.equal(
       outcome.kind === "allowed" ? outcome.submission.hash : undefined,
       "admin_tx_hash_123",
+    );
+  });
+});
+
+async function settle(): Promise<void> {
+  for (let i = 0; i < 6; i += 1) await Promise.resolve();
+}
+
+describe("waitForAdminOp (issue #466)", () => {
+  const adminKp = Keypair.random();
+
+  async function submittedFreeze(): Promise<AdminOpOutcome> {
+    const outcome = await submitFreeze({
+      server: createMockServer(adminKp.publicKey()) as never,
+      guard: GUARD,
+      admin: adminKp,
+      pollIntervalMs: 1,
+    });
+    assert.equal(outcome.kind, "allowed");
+    return outcome as AdminOpOutcome;
+  }
+
+  it("brands each submit outcome and waits for the matching transaction hash", async () => {
+    const outcome = await submittedFreeze();
+    assert.ok(isAdminOpOutcome(outcome));
+
+    const reads: string[] = [];
+    const server = {
+      getTransaction: async (hash: string) => {
+        reads.push(hash);
+        return {
+          status: rpc.Api.GetTransactionStatus.SUCCESS,
+          ledger: 1001,
+          events: { contractEventsXdr: [] },
+        };
+      },
+    } as unknown as never;
+
+    const result = await waitForAdminOp(outcome, { server, timeoutMs: 1_000 });
+    assert.deepEqual(reads, ["admin_tx_hash_123"]);
+    assert.equal(result.status, "confirmed");
+    assert.equal(result.transactionHash, "admin_tx_hash_123");
+    assert.equal(result.ledger, 1001);
+    assert.deepEqual(result.admin, {
+      op: "freeze",
+      guard: GUARD,
+      transactionHash: "admin_tx_hash_123",
+    });
+  });
+
+  it("polls without rebroadcasting and becomes confirmed after a pending read", async () => {
+    const outcome = await submittedFreeze();
+    const clock = new FakeClock();
+    let reads = 0;
+    let sends = 0;
+    const server = {
+      getTransaction: async () => {
+        reads += 1;
+        return reads === 1
+          ? { status: rpc.Api.GetTransactionStatus.NOT_FOUND }
+          : {
+              status: rpc.Api.GetTransactionStatus.SUCCESS,
+              ledger: 1002,
+              events: { contractEventsXdr: [] },
+            };
+      },
+      sendTransaction: async () => {
+        sends += 1;
+        throw new Error("waitForAdminOp must never rebroadcast");
+      },
+    } as unknown as never;
+
+    const pendingWait = waitForAdminOp(outcome, {
+      server,
+      clock,
+      timeoutMs: 1_000,
+      pollIntervalMs: 100,
+    });
+    await settle();
+    assert.equal(reads, 1);
+    clock.advance(100);
+    await settle();
+
+    const result = await pendingWait;
+    assert.equal(result.status, "confirmed");
+    assert.equal(result.ledger, 1002);
+    assert.equal(reads, 2);
+    assert.equal(sends, 0);
+  });
+
+  it("returns pending when the confirmation budget expires", async () => {
+    const outcome = await submittedFreeze();
+    const clock = new FakeClock();
+    let reads = 0;
+    const server = {
+      getTransaction: async () => {
+        reads += 1;
+        return { status: rpc.Api.GetTransactionStatus.NOT_FOUND };
+      },
+    } as unknown as never;
+
+    const pendingWait = waitForAdminOp(outcome, {
+      server,
+      clock,
+      timeoutMs: 1_000,
+      pollIntervalMs: 100,
+    });
+    await settle();
+    clock.advance(1_000);
+    await settle();
+
+    const result = await pendingWait;
+    assert.equal(result.status, "pending");
+    assert.match(result.detail, /not confirmed within 1000ms/);
+    assert.equal(result.ledger, null);
+    assert.ok(reads >= 1);
+  });
+
+  it("returns pending on abort without treating it as a failure", async () => {
+    const outcome = await submittedFreeze();
+    const controller = new AbortController();
+    controller.abort();
+    let reads = 0;
+    const server = {
+      getTransaction: async () => {
+        reads += 1;
+        return { status: rpc.Api.GetTransactionStatus.SUCCESS };
+      },
+    } as unknown as never;
+
+    const result = await waitForAdminOp(outcome, { server, signal: controller.signal });
+    assert.equal(result.status, "pending");
+    assert.match(result.detail, /aborted/);
+    assert.equal(reads, 0);
+  });
+
+  it("returns undetermined for an RPC error or an unrecognized status", async () => {
+    const outcome = await submittedFreeze();
+    const failing = {
+      getTransaction: async () => {
+        throw new Error("rpc offline");
+      },
+    } as unknown as never;
+    const failedRead = await waitForAdminOp(outcome, { server: failing });
+    assert.equal(failedRead.status, "undetermined");
+    assert.match(failedRead.detail, /rpc offline/);
+
+    const unknownStatus = {
+      getTransaction: async () => ({ status: "FUTURE_STATUS" }),
+    } as unknown as never;
+    const unknown = await waitForAdminOp(outcome, { server: unknownStatus });
+    assert.equal(unknown.status, "undetermined");
+    assert.match(unknown.detail, /unrecognized status/);
+  });
+
+  it("fails fast for a non-admin or hashless outcome", async () => {
+    const server = createMockServer(adminKp.publicKey()) as never;
+    await assert.rejects(
+      waitForAdminOp({} as AdminOpOutcome, { server }),
+      (error: unknown) => {
+        assert.ok(error instanceof InvalidInputError);
+        assert.match(error.message, /admin_outcome/);
+        return true;
+      },
+    );
+
+    const dryRun = await submitFreeze({
+      server,
+      guard: GUARD,
+      admin: adminKp,
+      dryRun: true,
+      pollIntervalMs: 1,
+    });
+    assert.ok(isAdminOpOutcome(dryRun));
+    await assert.rejects(
+      waitForAdminOp(dryRun, { server }),
+      (error: unknown) => {
+        assert.ok(error instanceof InvalidInputError);
+        assert.match(error.message, /transaction hash/);
+        return true;
+      },
     );
   });
 });
