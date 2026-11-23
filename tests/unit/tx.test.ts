@@ -757,17 +757,14 @@ describe("signerTimeoutMs bounds remote signer callbacks (issue #472)", () => {
 
     const pending = buildGuardAuthEntry({ ...base, signer, signerTimeoutMs: 25 });
     t.mock.timers.tick(25);
-    await assert.rejects(
-      pending,
-      (error: unknown) => {
-        assert.ok(error instanceof SignerTimeoutError);
-        assert.ok(error instanceof SigningError);
-        assert.equal(error.timeoutMs, 25);
-        assert.equal(error.address, GUARD);
-        assert.match(error.name, /SignerTimeoutError/);
-        return true;
-      },
-    );
+    await assert.rejects(pending, (error: unknown) => {
+      assert.ok(error instanceof SignerTimeoutError);
+      assert.ok(error instanceof SigningError);
+      assert.equal(error.timeoutMs, 25);
+      assert.equal(error.address, GUARD);
+      assert.match(error.name, /SignerTimeoutError/);
+      return true;
+    });
     assert.equal(calls, 1, "the bound stops waiting without re-invoking the signer");
   });
 

@@ -451,9 +451,7 @@ export async function submitHeartbeat(params: SubmitHeartbeatParams): Promise<He
     ...(params.pollAttempts !== undefined ? { pollAttempts: params.pollAttempts } : {}),
     ...(params.pollIntervalMs !== undefined ? { pollIntervalMs: params.pollIntervalMs } : {}),
     ...(params.signal !== undefined ? { signal: params.signal } : {}),
-    ...(params.signerTimeoutMs !== undefined
-      ? { signerTimeoutMs: params.signerTimeoutMs }
-      : {}),
+    ...(params.signerTimeoutMs !== undefined ? { signerTimeoutMs: params.signerTimeoutMs } : {}),
   });
   const ledger = outcome.kind === "allowed" ? outcome.submission.ledger : null;
   return {

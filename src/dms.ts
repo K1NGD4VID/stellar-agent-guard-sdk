@@ -87,13 +87,7 @@ export function dmsUrgency(
  * is no countdown instead of collapsing three different operator actions into
  * one grey badge.
  */
-export type DmsCountdownState =
-  | "no_policy"
-  | "disabled"
-  | "never"
-  | "ok"
-  | "warn"
-  | "expired";
+export type DmsCountdownState = "no_policy" | "disabled" | "never" | "ok" | "warn" | "expired";
 
 export interface FormatDmsCountdownOptions {
   /** Overrides `status.now`, with the same meaning as `dmsUrgency`'s override. */

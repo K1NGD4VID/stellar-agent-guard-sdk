@@ -348,3 +348,60 @@ node scripts/check-doc-links.ts
 
 The offline checks above passed; they do not substitute for the live-testnet
 scenarios.
+
+## Addendum — 2026-11-23 (PR #520: admin outcomes, DMS copy, redacting logger, signer timeouts; issues #466, #467, #471, #472)
+
+This PR touches `src/tx.ts` and `src/invoke.ts`, so the enforcement-path evidence
+file is included as required.
+
+**The live suite did not reach its enforcement scenarios.**
+`GUARD_KEEP_EPHEMERAL=1 npm run test:integration` used the documented default
+ephemeral deployment. It verified the Phase-1 artifact identity, generated keys,
+funded and deployed a SAC (`CAOFKFGHBSVHJERW2DV7LJW3AIKCSIY3AGXWTBJTLIWEBMGN66DFEXJ2`,
+tx `0c8096089aba10db33dbc69ebfa0f0f9f068b495c61f43731022e01d041cc298`) and a guard
+(`CAFDHYFPNTGVOHRBR4RCZOLPJ6UL4XKXVPSROY3XIZFBE52VMFMUX6YW`,
+tx `6169569e0b43b5d110c61505c3a9d5a6448e42067ccb386fe141094adeb44f09`) from WASM
+`f47919f92e78fdd034836aa61955fc338dd56a218c448c37df1867a8c3da0f63`, then failed
+during `initialize` with `txBadAuthExtra`
+(tx `801b8e7f0231e08e79f01ec10d1f315041d4c9a8389b1c6abb911787210cfa4f`). This is
+the known initialize/key-role failure recorded above; it reproduces independently
+of this change. No fresh live enforcement result is claimed. The generated
+ephemeral environment file was removed after the public identifiers were captured.
+
+### What the PR changes on the enforcement path
+
+- `src/tx.ts`: adds `signDigestWithBound()` and extends `buildGuardAuthEntry()`
+  with `signerTimeoutMs`, so a hanging remote signer fails as a typed
+  `SignerTimeoutError` instead of stalling the pipeline.
+- `src/invoke.ts`: validates and forwards `signerTimeoutMs` to the signing
+  boundary and reports that timeout as a typed signer error.
+- The enforced simulation, policy encoding/decoding, and `blocked`/`admissible`
+  decision rules are unchanged. The admin-outcome, DMS-copy and logger work is
+  additive around the pipeline and cannot turn a refusal into a pass.
+
+### What did run locally
+
+```text
+npm run typecheck
+npm run check:strict-ratchet
+npm run test:types
+npm run lint
+npm run format:check
+npm test
+npm run test:coverage:floor
+npm run build
+npm run test:browser
+npm run test:types:packed
+npm run test:smoke
+npm run test:exports
+npm run test:packed-install
+npm run test:pack
+npm run check:attw
+npm run check:bundle-size
+node scripts/check-enforcement-evidence.ts --check-structure
+```
+
+The full offline unit suite passed (1284 pass, 1 skipped, 0 fail). These checks do
+not substitute for the Phase-2 live scenarios. A maintainer should rerun
+`npm run test:integration` successfully once the known deployment-tooling
+`txBadAuthExtra` issue is resolved.

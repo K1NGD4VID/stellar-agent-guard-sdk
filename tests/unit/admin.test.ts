@@ -567,14 +567,11 @@ describe("waitForAdminOp (issue #466)", () => {
 
   it("fails fast for a non-admin or hashless outcome", async () => {
     const server = createMockServer(adminKp.publicKey()) as never;
-    await assert.rejects(
-      waitForAdminOp({} as AdminOpOutcome, { server }),
-      (error: unknown) => {
-        assert.ok(error instanceof InvalidInputError);
-        assert.match(error.message, /admin_outcome/);
-        return true;
-      },
-    );
+    await assert.rejects(waitForAdminOp({} as AdminOpOutcome, { server }), (error: unknown) => {
+      assert.ok(error instanceof InvalidInputError);
+      assert.match(error.message, /admin_outcome/);
+      return true;
+    });
 
     const dryRun = await submitFreeze({
       server,
@@ -584,13 +581,10 @@ describe("waitForAdminOp (issue #466)", () => {
       pollIntervalMs: 1,
     });
     assert.ok(isAdminOpOutcome(dryRun));
-    await assert.rejects(
-      waitForAdminOp(dryRun, { server }),
-      (error: unknown) => {
-        assert.ok(error instanceof InvalidInputError);
-        assert.match(error.message, /transaction hash/);
-        return true;
-      },
-    );
+    await assert.rejects(waitForAdminOp(dryRun, { server }), (error: unknown) => {
+      assert.ok(error instanceof InvalidInputError);
+      assert.match(error.message, /transaction hash/);
+      return true;
+    });
   });
 });
