@@ -24,7 +24,12 @@ import {
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
-import { AuthRefreshError, ContractResponseError, SignerTimeoutError, SigningError } from "../../src/errors.ts";
+import {
+  AuthRefreshError,
+  ContractResponseError,
+  SignerTimeoutError,
+  SigningError,
+} from "../../src/errors.ts";
 import {
   BroadcastError,
   DEFAULT_AUTH_REFRESH_MARGIN_LEDGERS,

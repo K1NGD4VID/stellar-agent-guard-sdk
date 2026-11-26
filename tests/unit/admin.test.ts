@@ -745,7 +745,8 @@ describe("previewSetPolicy (issue #465)", () => {
     assert.deepEqual(preview.current, TEST_POLICY);
     assert.ok(
       preview.diff.some(
-        (change) => change.field === "per_tx_cap" && change.before === 1000n && change.after === 2000n,
+        (change) =>
+          change.field === "per_tx_cap" && change.before === 1000n && change.after === 2000n,
       ),
     );
     assert.equal(simulations(), 1);
