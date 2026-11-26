@@ -692,13 +692,9 @@ describe("previewSetPolicy (issue #465)", () => {
     let writes = 0;
     let simulations = 0;
     const server = {
-      getLedgerEntries: async (...keys: unknown[]) => {
-        const key = (keys[0] as { toXDR?: (enc: string) => string } | undefined)?.toXDR?.(
-          "base64",
-        );
+      getLedgerEntries: async (..._keys: unknown[]) => {
         return {
           entries: [policyEntry, windowEntry].filter((e): e is NonNullable<typeof e> => e !== null),
-          // return both; fetchGuardPolicyAndWindow calls twice in parallel? easier: return by key index
         };
       },
       getContractData: async (_guard: unknown, key: xdr.ScVal) => {
