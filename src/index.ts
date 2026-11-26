@@ -298,6 +298,7 @@ export {
   InMemoryCursorStore,
   compareCommittedEvents,
   computePollDelay,
+  describeGap,
   describeGuardEvent,
   diagnosticsToEvents,
   guardEventId,
